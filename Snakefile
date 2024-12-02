@@ -1,44 +1,68 @@
-SAMPLE = ['A','B','C']
-rule target:
-    input:
-        'plots/quals.pdf'
+# Snakefile: A Snakemake script for aligning reads, converting, sorting, and indexing BAM files.
+
+# Define sample names
+SAMPLES = ["A", "B", "C"]
+
+# Rule to align reads using BWA and convert SAM to BAM
 rule bwa_map:
     input:
-        Ref ='data/genome.fa',
-        fastq ='data/samples/{sample}.fastq',
+        ref="data/genome.fa",
+        query="data/samples/{sample}.fastq"
     output:
-        'mapped_reads/{sample}.bam'
+        bam="mapped_reads/{sample}.bam"
     shell:
-        'bwa mem {input}| samtools view -Sb -> {output}'  
+        """
+        bwa mem {input.ref} {input.query} | samtools view -Sb - > {output.bam}
+        """
+
+# Rule to sort BAM files
 rule samtools_sort:
     input:
-        'mapped_reads/{sample}.bam'
+        bam="mapped_reads/{sample}.bam"
     output:
-        'sorted_reads/{sample}.bam'
+        sorted_bam="sorted_reads/{sample}.bam"
     shell:
-        'samtools sort -T sorted_reads/{wildcards.sample} -O bam {input} > {output}'
+        """
+        samtools sort -T sorted_reads/{wildcards.sample} -O bam {input.bam} > {output.sorted_bam}
+        """
+
+# Rule to index BAM files
 rule samtools_index:
     input:
-        'sorted_reads/{sample}.bam'
+        sorted_bam="sorted_reads/{sample}.bam"
     output:
-        'sorted_reads/{sample}.bam.bai'
+        bai="sorted_reads/{sample}.bam.bai"
     shell:
-        'samtools index {input}'
-rule bcftools_call:
+        """
+        samtools index {input.sorted_bam}
+        """
+
+# Rule to aggregate BAM files into VCF
+rule call_variants:
     input:
-        fa = 'data/genome.fa',
-        bam = expand('sorted_reads/{sample}.bam', sample = SAMPLE),
-        bai = expand('sorted_reads/{sample}.bam.bai', sample = SAMPLE),
+        fa="data/genome.fa",
+        bam=expand("sorted_reads/{sample}.bam", sample=SAMPLES),
+        bai=expand("sorted_reads/{sample}.bam.bai", sample=SAMPLES)
     output:
-        'calls/all.vcf'
+        vcf="calls/all.vcf"
     shell:
-        'bcftools mpileup -f {input.fa} {input.bam} | '
-        'bcftools call -mv -> {output}'   
+        """
+        bcftools mpileup -f {input.fa} {input.bam} | bcftools call -mv - > {output.vcf}
+        """
+
+# Example of adding custom scripts
 rule plot_quals:
     input:
-        'calls/all.vcf'
+        vcf="calls/all.vcf"
     output:
-        'plots/quals.pdf'
+        plot="plots/quals.pdf"
     script:
-        'Scripts/plot_quals.py'
+        "scripts/plot_quals.py"
 
+# Target rule for final output
+rule all:
+    input:
+        expand("sorted_reads/{sample}.bam", sample=SAMPLES),
+        expand("sorted_reads/{sample}.bam.bai", sample=SAMPLES),
+        "calls/all.vcf",
+        "plots/quals.pdf"
