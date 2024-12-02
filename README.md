@@ -61,9 +61,11 @@ snakemake --cores 1 --dry-run
 snakemake --cores 1
 ### Generate Workflow Graph
 snakemake --dag | dot -Tpdf > workflow_dag.pdf
+
 **Option2**
 ### Run on Multiple Cores
 snakemake --cores 4
+
 **Option3**
 ### Clean Intermediate Files
 snakemake --cores 1 --delete-temp-output
